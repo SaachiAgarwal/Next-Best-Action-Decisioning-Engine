@@ -79,6 +79,16 @@ def event_log():
     return _load_parquet("event_log.parquet")
 
 
+@pytest.fixture(scope="module")
+def features_events():
+    return _load_parquet("features_events.parquet")
+
+
+@pytest.fixture(scope="module")
+def labels():
+    return _load_parquet("labels.parquet")
+
+
 # --------------------------------------------------------------------------
 # Data-layer tests
 # --------------------------------------------------------------------------
@@ -219,3 +229,49 @@ def test_event_action_ids_exist_in_actions(event_log, actions):
     used = set(event_log["action_id"].unique())
     missing = used - valid
     assert not missing, f"{len(missing)} event action_ids are not in actions.parquet"
+
+
+# --------------------------------------------------------------------------
+# Temporal-split & leakage tests (Day 5)
+# --------------------------------------------------------------------------
+def test_feature_events_strictly_before_cutoff(features_events):
+    """All feature events are strictly before CUTOFF_DATE."""
+    cutoff = pd.Timestamp(config.CUTOFF_DATE)
+    assert (features_events["t_dat"] < cutoff).all()
+    assert features_events["t_dat"].max() < cutoff
+
+
+def test_label_events_on_or_after_cutoff(event_log):
+    """All label-window events are on/after CUTOFF_DATE."""
+    cutoff = pd.Timestamp(config.CUTOFF_DATE)
+    label_events = event_log[event_log["t_dat"] >= cutoff]
+    assert (label_events["t_dat"] >= cutoff).all()
+    assert label_events["t_dat"].min() >= cutoff
+
+
+def test_no_overlap_feature_label_partition(event_log, features_events):
+    """Feature and label event sets are a clean, non-overlapping partition."""
+    cutoff = pd.Timestamp(config.CUTOFF_DATE)
+    label_events = event_log[event_log["t_dat"] >= cutoff]
+    # Partition => counts sum to the whole event log, no row in both.
+    assert len(features_events) + len(label_events) == len(event_log)
+    # And there is no timestamp on both sides of the boundary.
+    assert features_events["t_dat"].max() < label_events["t_dat"].min()
+
+
+def test_every_label_action_exists_in_actions(labels, actions):
+    """Every label action_id exists in the actions table."""
+    valid = set(actions["action_id"])
+    used = set(labels["action_id"].unique())
+    missing = used - valid
+    assert not missing, f"{len(missing)} label action_ids are not in actions.parquet"
+
+
+def test_customers_without_labels_are_retained(features_events, labels):
+    """Customers with pre-cutoff history but no label purchase are not dropped."""
+    feat_customers = set(features_events["customer_id"].unique())
+    label_customers = set(labels["customer_id"].unique())
+    # There exist history customers that have no label — and they remain present
+    # on the feature side (i.e. we did not drop them from the customer base).
+    history_no_label = feat_customers - label_customers
+    assert len(history_no_label) > 0

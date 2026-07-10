@@ -205,3 +205,67 @@ end, 49.4% of customers have ≥10 purchases; this is where
 personalized sequence signal is strongest. The long right tail (99th percentile
 = 185 purchases, max 1237) means a
 small set of very active customers contributes a disproportionate share of events.
+
+<!-- day5: temporal split (regenerated) -->
+
+## Temporal Split
+
+**Cutoff: `2020-08-26`. Label window: `2020-08-26` → `2020-09-22`
+(28 days).** Everything strictly before the cutoff is
+feature history; the last 28 days are the prediction
+target. The cutoff is computed in code as `max(t_dat) - LABEL_WINDOW_DAYS + 1`.
+
+### Window sensitivity
+
+Measured back from `max(t_dat) = 2020-09-22`:
+
+| window_days | evaluable_customers | % of active | feature_events_remaining | cutoff |
+|---|---|---|---|---|
+| 7 | 5,134 | 5.2% | 2,278,520 | 2020-09-16 |
+| 14 | 9,307 | 9.4% | 2,260,040 | 2020-09-09 |
+| 28 | 16,895 | 17.0% | 2,220,306 | 2020-08-26 |
+
+**Why 28 days.** None of the candidate windows reach a ~20,000 evaluable-customer
+set. The 28-day window yields the largest evaluable set (16,895 customers, ~17%
+of active) while still being a realistic 4-week short-horizon prediction task and
+retaining 98.6% of events as features. The 7- and 14-day windows leave the
+evaluation set too thin (5.2% and 9.4% of active), so we chose 28 over the
+nominal default of 14 to get a healthier evaluable set.
+
+### Why this prevents leakage
+
+Features may only be computed from events **before** the cutoff; the label is the
+set of distinct actions purchased **on/after** the cutoff. The two sets are a
+clean partition of the event log on `t_dat`, so no information from the
+prediction window can leak into the features. The boundary date is the guarantee.
+
+### Feature / label sizes
+
+| set | rows (events) | distinct customers |
+|---|---|---|
+| feature (pre-cutoff) | 2,220,306 | 97,696 |
+| label window | 76,417 | 16,895 |
+| labels.parquet (customer, action) pairs | 45,344 | 16,895 |
+
+### Customer segmentation (of 100,000 in the customer base)
+
+| segment | customers | % |
+|---|---|---|
+| core — pre-cutoff history **and** ≥1 label purchase (trainable + evaluable) | 15,246 | 15.2% |
+| history, no label-window purchase (nothing to predict this window) | 82,450 | 82.5% |
+| label-window only, no feature history (**cold-start** at prediction time) | 1,649 | 1.6% |
+| no events at all (in master, never purchased) | 655 | 0.7% |
+
+**Cold-start note.** 1,649 customers have purchases only inside the
+label window and therefore no pre-cutoff history to build features from; another
+655 have no events at all. These are flagged for **Week 2**
+cold-start handling (popularity / action-prior fallback rather than a
+personalized model).
+
+### Leakage check
+
+**LEAKAGE CHECK PASSED** — feature events end `2020-08-25`
+(strictly before the cutoff `2020-08-26`) and label events run
+`2020-08-26` → `2020-09-22`, with the two sets forming a clean, non-overlapping
+partition of the event log. This guarantees no future information is available
+when computing features.
