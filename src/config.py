@@ -16,6 +16,13 @@ PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 # Output directory for generated reports and figures.
 REPORTS_DIR = PROJECT_ROOT / "reports"
 
+# Sampling configuration — defines the working dataset for the whole project.
+# We sample a fixed set of customers (and their complete purchase history) so
+# development stays tractable locally. The seed lives here so the exact same
+# sample regenerates on every run and on every machine.
+SAMPLE_CUSTOMERS = 100000
+SAMPLE_SEED = 42
+
 # Placeholder constants (to be filled in during later milestones).
 CUTOFF_DATE = None
 ACTION_GRANULARITY = "product_group_name"
