@@ -64,6 +64,16 @@ def customers():
     return _load_parquet("customers.parquet")
 
 
+@pytest.fixture(scope="module")
+def actions():
+    return _load_parquet("actions.parquet")
+
+
+@pytest.fixture(scope="module")
+def article_action_map():
+    return _load_parquet("article_action_map.parquet")
+
+
 # --------------------------------------------------------------------------
 # Data-layer tests
 # --------------------------------------------------------------------------
@@ -112,3 +122,48 @@ def test_sampled_customer_count_within_cap(customers):
     It equals SAMPLE_CUSTOMERS unless the full dataset has fewer customers.
     """
     assert customers["customer_id"].nunique() <= config.SAMPLE_CUSTOMERS
+
+
+# --------------------------------------------------------------------------
+# Cleaning + action-space tests (Day 3)
+# --------------------------------------------------------------------------
+def test_no_transaction_has_nonpositive_price(transactions):
+    """Cleaning removes impossible transactions: no price <= 0 remains."""
+    assert (transactions["price"] <= 0).sum() == 0
+
+
+def test_article_id_string_after_cleaning(transactions, articles, article_action_map):
+    """article_id stays string dtype through cleaning and the action map."""
+    assert str(transactions["article_id"].dtype) == "string"
+    assert str(articles["article_id"].dtype) == "string"
+    assert str(article_action_map["article_id"].dtype) == "string"
+
+
+def test_every_article_maps_to_exactly_one_action(articles, article_action_map):
+    """Each cleaned article maps to exactly one action (no dup / no missing)."""
+    # No article_id appears more than once in the map.
+    assert article_action_map["article_id"].duplicated().sum() == 0
+    # Every article in the cleaned articles table is present in the map.
+    mapped = set(article_action_map["article_id"])
+    missing = set(articles["article_id"]) - mapped
+    assert not missing, f"{len(missing)} articles have no action mapping"
+    # Every mapped article has a non-null action_id.
+    assert article_action_map["action_id"].notna().all()
+
+
+def test_action_id_unique_per_product_type(actions, article_action_map):
+    """action_id is a stable 1:1 id per product_type_name."""
+    # In the actions table: unique action_id and unique product_type_name.
+    assert actions["action_id"].duplicated().sum() == 0
+    assert actions["product_type_name"].duplicated().sum() == 0
+    # In the map: exactly one action_id per product_type_name.
+    per_type = article_action_map.groupby("product_type_name")["action_id"].nunique()
+    assert (per_type == 1).all()
+
+
+def test_map_covers_every_transaction_article(transactions, article_action_map):
+    """The article->action map covers every article_id present in transactions."""
+    tx_articles = set(transactions["article_id"].unique())
+    mapped = set(article_action_map["article_id"])
+    uncovered = tx_articles - mapped
+    assert not uncovered, f"{len(uncovered)} transaction articles are unmapped"

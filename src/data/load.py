@@ -279,3 +279,19 @@ def save_parquet(transactions, articles, customers) -> None:
     transactions.to_parquet(config.PROCESSED_DIR / "transactions.parquet", engine="pyarrow")
     articles.to_parquet(config.PROCESSED_DIR / "articles.parquet", engine="pyarrow")
     customers.to_parquet(config.PROCESSED_DIR / "customers.parquet", engine="pyarrow")
+
+
+def load_processed():
+    """Load the sampled tables previously written to data/processed.
+
+    Downstream stages (cleaning, action space, features) work off this sampled
+    parquet rather than re-scanning the 3.5 GB raw CSV each run.
+
+    Returns ``(transactions, articles, customers)``.
+    """
+    for name in ("transactions.parquet", "articles.parquet", "customers.parquet"):
+        _require(config.PROCESSED_DIR / name)
+    transactions = pd.read_parquet(config.PROCESSED_DIR / "transactions.parquet", engine="pyarrow")
+    articles = pd.read_parquet(config.PROCESSED_DIR / "articles.parquet", engine="pyarrow")
+    customers = pd.read_parquet(config.PROCESSED_DIR / "customers.parquet", engine="pyarrow")
+    return transactions, articles, customers

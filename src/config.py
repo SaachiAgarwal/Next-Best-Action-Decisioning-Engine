@@ -25,4 +25,9 @@ SAMPLE_SEED = 42
 
 # Placeholder constants (to be filled in during later milestones).
 CUTOFF_DATE = None
-ACTION_GRANULARITY = "product_group_name"
+
+# Granularity of the action space. Product-type granularity balances
+# recommendation precision against statistical learnability: it avoids
+# article-level sparsity (too many actions, too few observations each) while
+# staying more actionable than broad product groups.
+ACTION_GRANULARITY = "product_type_name"
