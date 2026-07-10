@@ -164,3 +164,44 @@ Top 15 actions by purchase volume:
 | 88 | skirt | 2,274 | 67,381 | 23,743 |
 | 84 | shirt | 2,700 | 55,916 | 23,803 |
 | 60 | leggings/tights | 1,343 | 53,047 | 21,904 |
+
+<!-- day4: event log + behavior (regenerated) -->
+
+## Event Log & Customer Behavior
+
+The **event log** (`event_log.parquet`) is every purchase as a time-ordered,
+per-customer sequence: one row per `(customer, article)` purchase, sorted by
+`customer_id`, then `t_dat`, then `article_id`. This ordering is the temporal
+backbone of the project — all downstream feature windows, train/eval splits, and
+next-action targets read history strictly in time order, which is what prevents
+**leakage** (using the future to predict the past). Same-day purchases (only
+day-resolution timestamps exist) are tie-broken by `article_id` so the sequence
+is deterministic and reproducible.
+
+**Sequence features added (within each customer's ordered history):**
+
+- `purchase_number` — 1..n ordinal position of the purchase.
+- `days_since_first_purchase` — days between this event and the customer's first.
+- `days_since_prev_purchase` — days since the immediately prior event; **0 for
+  the first purchase** (no prior event), kept non-null and integer.
+
+**Behavioral profile (99,345 customers, 2,296,723 events):**
+
+| metric | value |
+|---|---|
+| transactions/customer — min / median / mean / max | 1 / 9 / 23.12 / 1237 |
+| purchases/customer percentiles — 50th / 90th / 99th | 9 / 59 / 185 |
+| single-purchase customers (cold-start) | 9,623 (9.7%) |
+| customers with ≥10 purchases (rich history) | 49,079 (49.4%) |
+| avg repurchase gap (repeat purchases) | 12.3 days |
+| median customer tenure (date span covered) | 203 days |
+
+**Sparsity / cold-start note.** 9.7% of customers have only
+a single purchase in the sampled window — a non-trivial cold-start segment with
+no personal repeat-behavior signal at prediction time. Next-action modeling must
+handle these customers explicitly — e.g. fall back to popularity / action-prior
+recommendations — rather than assuming a rich per-customer sequence. At the other
+end, 49.4% of customers have ≥10 purchases; this is where
+personalized sequence signal is strongest. The long right tail (99th percentile
+= 185 purchases, max 1237) means a
+small set of very active customers contributes a disproportionate share of events.

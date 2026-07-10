@@ -74,6 +74,11 @@ def article_action_map():
     return _load_parquet("article_action_map.parquet")
 
 
+@pytest.fixture(scope="module")
+def event_log():
+    return _load_parquet("event_log.parquet")
+
+
 # --------------------------------------------------------------------------
 # Data-layer tests
 # --------------------------------------------------------------------------
@@ -167,3 +172,50 @@ def test_map_covers_every_transaction_article(transactions, article_action_map):
     mapped = set(article_action_map["article_id"])
     uncovered = tx_articles - mapped
     assert not uncovered, f"{len(uncovered)} transaction articles are unmapped"
+
+
+# --------------------------------------------------------------------------
+# Event-log tests (Day 4)
+# --------------------------------------------------------------------------
+def test_event_log_sorted_by_customer_then_date(event_log):
+    """Event log is sorted by (customer_id, t_dat) — checked on a sample."""
+    sample_ids = event_log["customer_id"].drop_duplicates().head(1000)
+    sample = event_log[event_log["customer_id"].isin(set(sample_ids))]
+    expected = sample.sort_values(
+        ["customer_id", "t_dat", "article_id"], kind="stable"
+    ).reset_index(drop=True)
+    assert sample.reset_index(drop=True).equals(expected)
+
+
+def test_purchase_number_starts_at_one_and_contiguous(event_log):
+    """purchase_number is 1..n with no gaps for every customer."""
+    grp = event_log.groupby("customer_id", sort=False)["purchase_number"]
+    assert (grp.min() == 1).all()
+    # Contiguity: max equals the count of events for each customer.
+    counts = event_log.groupby("customer_id", sort=False).size()
+    assert (grp.max() == counts).all()
+
+
+def test_days_since_first_is_zero_on_first_purchase(event_log):
+    """days_since_first_purchase == 0 for each customer's first purchase."""
+    firsts = event_log[event_log["purchase_number"] == 1]
+    assert (firsts["days_since_first_purchase"] == 0).all()
+
+
+def test_days_since_prev_never_negative(event_log):
+    """days_since_prev_purchase is never negative."""
+    assert (event_log["days_since_prev_purchase"] >= 0).all()
+
+
+def test_event_log_no_null_ids(event_log):
+    """No null customer_id or article_id in the event log."""
+    assert event_log["customer_id"].isnull().sum() == 0
+    assert event_log["article_id"].isnull().sum() == 0
+
+
+def test_event_action_ids_exist_in_actions(event_log, actions):
+    """Every event's action_id exists in the actions table."""
+    valid = set(actions["action_id"])
+    used = set(event_log["action_id"].unique())
+    missing = used - valid
+    assert not missing, f"{len(missing)} event action_ids are not in actions.parquet"
