@@ -66,3 +66,9 @@ VALID_WINDOW_DAYS = 28
 ALPHA_EXP3 = 0.5   # recency x log-frequency own-history signal
 BETA_EXP3 = 0.5    # recency-weighted collaborative-filtering signal
 GAMMA_EXP3 = 1.0   # global popularity prior (guarantees >= popularity floor)
+
+# --- Experiment 4: content-based + content/CF hybrid (article level) --------
+# Blend weights for final = CONTENT_ALPHA*content + CONTENT_BETA*cf (components
+# normalized). Defaults; tuned values live in hybrid_weights_exp4.json.
+CONTENT_ALPHA_EXP4 = 1.0   # content-similarity signal (article attributes)
+CONTENT_BETA_EXP4 = 1.0    # article-level CF signal (Exp B co-occurrence)
