@@ -48,3 +48,21 @@ CUTOFF_DATE = DATASET_MAX_DATE - timedelta(days=LABEL_WINDOW_DAYS - 1)
 # article-level sparsity (too many actions, too few observations each) while
 # staying more actionable than broad product groups.
 ACTION_GRANULARITY = "product_type_name"
+
+# --- Experiment 3: recency + frequency weighted hybrid ---------------------
+# Recency half-life: a purchase HALF_LIFE_DAYS before the reference date counts
+# half as much as one at the reference date (exponential decay).
+HALF_LIFE_DAYS = 30
+
+# Internal validation window carved from the FEATURE side for weight tuning.
+# The last VALID_WINDOW_DAYS of pre-cutoff events are held out as mini-labels;
+# the real post-cutoff labels are never used for tuning.
+VALID_WINDOW_DAYS = 28
+
+# Blend weights for the hybrid final score:
+#   final = ALPHA*personal + BETA*cf + GAMMA*popularity  (components normalized).
+# These are defaults; the tuned values live in hybrid_weights_exp3.json (chosen
+# by validation grid search) and are authoritative for reporting.
+ALPHA_EXP3 = 0.5   # recency x log-frequency own-history signal
+BETA_EXP3 = 0.5    # recency-weighted collaborative-filtering signal
+GAMMA_EXP3 = 1.0   # global popularity prior (guarantees >= popularity floor)
