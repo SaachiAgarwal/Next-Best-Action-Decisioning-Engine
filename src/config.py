@@ -72,3 +72,9 @@ GAMMA_EXP3 = 1.0   # global popularity prior (guarantees >= popularity floor)
 # normalized). Defaults; tuned values live in hybrid_weights_exp4.json.
 CONTENT_ALPHA_EXP4 = 1.0   # content-similarity signal (article attributes)
 CONTENT_BETA_EXP4 = 1.0    # article-level CF signal (Exp B co-occurrence)
+
+# --- Phase 2: LinUCB contextual bandit -------------------------------------
+# UCB exploration parameter: p_a = theta_a . x + BANDIT_ALPHA * sqrt(x . A_a^-1 . x).
+# 0 = pure exploitation (no exploration); higher = more exploration.
+BANDIT_ALPHA = 1.0
+SEED = SAMPLE_SEED  # 42 — single stochastic seed for the whole project
