@@ -1,94 +1,55 @@
 # ROADMAP — Next-Best-Action Decisioning Engine
 
-Status-aware build plan. Reconciled to actual progress as of Week 2 complete.
-Global rules: SEED = 42 everywhere stochastic. Every layer is a standalone
-runnable script in src/. Named files, not throwaway notebooks. Specs for
-upcoming phases are firmed up as we reach them, grounded in what the data
-actually did the phase before.
+Status-aware build plan. SEED = 42 everywhere stochastic. Every layer is a
+standalone runnable script in src/. Leakage-safe evaluation is a hard gate.
 
-Legend: [DONE] complete · [PARTIAL] started, gap remains · [TODO] not started
+Legend: [DONE] · [NEXT] · [TODO]
 
----
+## Phase 0 — Product framing
+- [DONE] AI PRD (9-section template)
 
-## WHERE WE ARE
+## Phase 1 — Data & recommender
+- [DONE] Sampling (100k, seed=42), action space (product-type, 128), event log,
+  leakage-safe temporal split
+- [DONE] Recommender study (4 experiments):
+  - Exp A: product-type popularity + item-CF (popularity won)
+  - Exp B: article-level CF (collapsed on sparsity)
+  - Exp 3: product-type recency+frequency hybrid (beat popularity, +3.6% divergent)
+  - Exp 4: article-level content + content/CF hybrid (first article model to beat
+    popularity, +44% @12; content/CF equal weights = complementary signals)
+- [DONE] Standalone feature/context layer (RFM + attributes + breadth,
+  cold-start flagged, leakage-guarded, model-ready encoding)
 
-Foundation and the candidate/scoring layer are built and rigorously tested.
-The three things that make this a *decisioning engine* and a *PM* portfolio
-piece — the bandit, the constraints/arbitration layer, the explanation agent,
-the clickable UI, and the product+business framing — are the work ahead.
+## Phase 2 — Contextual bandit (NBA core)
+- [NEXT] Context + reward definition; UCB contextual bandit over the 128
+  product-type actions, conditioned on customer_context, with auditable
+  decision logging (confidence term per decision); cold-start (is_cold_start)
+  falls back to a non-contextual policy
+- [TODO] Baselines (random, popularity) + reward / regret curves
 
----
+## Phase 2b — Hierarchical drill-down (Option C)
+- [TODO] Within the bandit's chosen product-type, select the specific article
+  using the Exp 4 content+CF recommender -> SKU-level next best action
+  (reuses Exp 4; turns the study into a working engine layer)
 
-## PROJECT MAP
+## Phase 3 — Constraints & arbitration
+- [TODO] Eligibility + fatigue/cooldown (using ~12-day repurchase cadence) +
+  budget caps; arbitration picks the final action under constraints, logging
+  why each candidate was allowed/blocked (auditability)
 
-### Phase 0 — Product framing (NEW, front-loaded)
-- [TODO] P0.1 — PRD / one-page product framing (problem, user, KPIs, the
-  decision automated, scope, non-goals)
+## Phase 4 — RAG explainer + Lovable UI
+- [TODO] Grounding corpus of real article facts + retrieval; explanation
+  generation + claim-fidelity safeguard (block/log unsupported claims);
+  Lovable app: customer -> NBA -> constraint-checked grounded "why"
 
-### Phase 1 — Data & candidate recommender
-- [DONE] Cohort sampling (100k customers, seed=42, leakage-safe)
-- [DONE] Action space (product-type, 128 actions) + event log + temporal split
-- [PARTIAL] Feature/context layer — recency & frequency exist inside the
-  hybrid, but no standalone reusable RFM + context vector yet (bandit needs it)
-- [DONE] Candidate recommender: popularity, item-CF, granularity experiment
-  (Exp A/B), recency+frequency hybrid (Exp 3) with divergent-slice eval
+## Phase 5 — Evaluation & write-up
+- [TODO] Offline policy evaluation (IPS / replay) with variance; business-metric
+  translation (conversion uplift, fatigue cost); Responsible-AI section
+  (auditability, fairness across segments); Mitchell et al. 2019 model card;
+  README + fresh-clone reproducibility pass
 
-### Phase 2 — Contextual bandit (NBA core)
-- [TODO] P2.1 — Context vector assembly + reward definition
-- [TODO] P2.2 — UCB contextual bandit over candidates, with auditable
-  decision logging (confidence terms recorded per decision)
-- [TODO] P2.3 — Baselines (random, popularity) + reward/regret curves
-
-### Phase 3 — Business constraints & arbitration (NEW — the "decisioning" layer)
-- [TODO] P3.1 — Eligibility + fatigue/cooldown rules (using the ~12-day
-  repurchase cadence), budget/frequency caps
-- [TODO] P3.2 — Arbitration: pick the final action under constraints;
-  log why each candidate was allowed/blocked (auditability)
-
-### Phase 4 — RAG explanation agent + Lovable UI
-- [TODO] P4.1 — Grounding corpus of real article facts + retrieval
-- [TODO] P4.2 — Explanation generation + claim-fidelity safeguard (block any
-  claim not supported by retrieved facts; log violations)
-- [TODO] P4.3 — Lovable app: pick a customer -> see the NBA -> see the
-  constraint-checked, grounded "why". Clickable, shareable demo.
-
-### Phase 5 — Evaluation, business impact & write-up
-- [TODO] P5.1 — Offline policy evaluation (IPS / replay) with variance
-- [TODO] P5.2 — Business-metric translation (projected conversion uplift,
-  revenue/customer, fatigue/over-targeting cost — the churn-project move)
-- [TODO] P5.3 — Responsible-AI section: auditability, guardrails, fairness
-  across segments, honest limitations
-- [TODO] P5.4 — Model card (Mitchell et al. 2019) + README polish +
-  fresh-clone reproducibility pass
-
----
-
-## IMMEDIATE NEXT STEP
-Phase 1 feature/context layer (the [PARTIAL] item) — a standalone RFM + context
-vector. It's the prerequisite that unblocks the contextual bandit; the bandit
-cannot be "contextual" without it.
-
----
-
-## THE PORTFOLIO THESIS (what this project proves)
-- Recommender: candidate generation + scoring (done, rigorously)
-- Agent: contextual bandit making next-best-action decisions
-- RAG: grounded, claim-checked explanations
-- UI: a clickable Lovable demo (recruiters click, they don't read code)
-- PM layer: PRD + business-metric impact + Responsible-AI/auditability —
-  aligned to the "Responsible AI for high-stakes regulated decisioning" niche
-
----
-
-## HONEST LIMITATIONS (maintained throughout, not bolted on at the end)
-1. No real experiment — observational logs; simulated A/B and offline policy
-   value are estimates, not causal proof.
-2. Off-policy evaluation bias — a policy scored on logs it partly generated can
-   look better than it is; report variance.
-3. Reward proxy — purchase under-represents returns, satisfaction, and
-   over-targeting fatigue.
-4. Bounded cohort — 2018–2020, primarily European markets, sampled; limits
-   generalization.
-5. Test-set integrity — model *design* was informed by aggregate findings from
-   earlier experiments; hyperparameters tuned on a feature-side validation
-   slice, test labels touched only for final reporting.
+## Honest limitations (maintained throughout)
+Observational data (no causal proof); off-policy evaluation bias; purchase is an
+imperfect reward proxy; bounded cohort (2018-2020, sampled, mostly European);
+model design informed by aggregate findings, hyperparameters tuned on a
+feature-side validation slice with test labels touched once.
