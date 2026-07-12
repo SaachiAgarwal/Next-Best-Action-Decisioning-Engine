@@ -78,3 +78,11 @@ CONTENT_BETA_EXP4 = 1.0    # article-level CF signal (Exp B co-occurrence)
 # 0 = pure exploitation (no exploration); higher = more exploration.
 BANDIT_ALPHA = 1.0
 SEED = SAMPLE_SEED  # 42 — single stochastic seed for the whole project
+
+# --- Phase 2 revision (v2): fair evaluation --------------------------------
+# Split the evaluable customers into a learning stream (the bandit updates on
+# these) and a held-out eval set (decisions only, never updated). Multi-pass
+# learning lets the weights converge; held-out eval is the honest generalization
+# test.
+BANDIT_LEARN_FRAC = 0.7   # fraction of evaluable customers used for learning
+BANDIT_EPOCHS = 5         # passes over the learning stream
