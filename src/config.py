@@ -73,6 +73,14 @@ GAMMA_EXP3 = 1.0   # global popularity prior (guarantees >= popularity floor)
 CONTENT_ALPHA_EXP4 = 1.0   # content-similarity signal (article attributes)
 CONTENT_BETA_EXP4 = 1.0    # article-level CF signal (Exp B co-occurrence)
 
+# --- Experiment 5: article-level matrix factorization -----------------------
+# Implicit-feedback MF (ALS): latent factors that generalize across articles,
+# vs. Exp B's explicit co-occurrence. Tested as a second escape from article-
+# level sparsity, benchmarked against the content-based escape (Exp 4).
+MF_FACTORS = 64    # latent dimension (swept 32/64/128 in the report)
+MF_EPOCHS = 15     # ALS iterations
+MF_REG = 0.01      # ALS regularization
+
 # --- Phase 2: LinUCB contextual bandit -------------------------------------
 # UCB exploration parameter: p_a = theta_a . x + BANDIT_ALPHA * sqrt(x . A_a^-1 . x).
 # 0 = pure exploitation (no exploration); higher = more exploration.
