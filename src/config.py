@@ -81,6 +81,13 @@ MF_FACTORS = 64    # latent dimension (swept 32/64/128 in the report)
 MF_EPOCHS = 15     # ALS iterations
 MF_REG = 0.01      # ALS regularization
 
+# --- Phase 2c: shared-model LinUCB at article level ------------------------
+# A single theta over the (customer, article) feature space (not per-arm), so
+# learning transfers across ~79k articles and even scores unseen ones. Candidate
+# retrieval (top-N via the Exp 5 triple hybrid) keeps scoring tractable.
+N_CANDIDATES = 100     # candidates retrieved per customer (the retrieval stage)
+SHARED_ALPHA = 1.0     # UCB exploration parameter for the shared model
+
 # --- Phase 2: LinUCB contextual bandit -------------------------------------
 # UCB exploration parameter: p_a = theta_a . x + BANDIT_ALPHA * sqrt(x . A_a^-1 . x).
 # 0 = pure exploitation (no exploration); higher = more exploration.
