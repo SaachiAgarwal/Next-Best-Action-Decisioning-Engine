@@ -88,6 +88,15 @@ MF_REG = 0.01      # ALS regularization
 N_CANDIDATES = 100     # candidates retrieved per customer (the retrieval stage)
 SHARED_ALPHA = 1.0     # UCB exploration parameter for the shared model
 
+# --- Phase 3b: diversity + constraint re-ranking ---------------------------
+# Two-stage: triple hybrid retrieves N_RETRIEVE candidates, the re-ranker selects
+# the final list trading accuracy for diversity/coverage/rule-compliance.
+N_RETRIEVE = 100       # candidates from stage-1 retrieval
+RERANK_LAMBDA = 0.7    # MMR: 1 = pure relevance, 0 = pure diversity
+POP_PENALTY = 0.3      # tail-exposure penalty on popularity rank (the coverage lever)
+FATIGUE_DAYS = 12      # cooldown: block a product type bought within this window
+CATEGORY_CAP = 3       # max articles of one product_type in the final 12
+
 # --- Phase 2: LinUCB contextual bandit -------------------------------------
 # UCB exploration parameter: p_a = theta_a . x + BANDIT_ALPHA * sqrt(x . A_a^-1 . x).
 # 0 = pure exploitation (no exploration); higher = more exploration.
