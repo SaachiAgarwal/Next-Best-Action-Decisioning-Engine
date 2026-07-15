@@ -4,6 +4,11 @@ data/processed/
 *.csv
 *.parquet
 
+# EXCEPTION: the Phase 5a demo JSON export IS committed (small; the Lovable
+# web app reads it directly). Whitelist the folder and its JSON.
+!data/demo/
+!data/demo/*.json
+
 # Python
 __pycache__/
 *.pyc
