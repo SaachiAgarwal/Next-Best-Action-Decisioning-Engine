@@ -97,6 +97,27 @@ POP_PENALTY = 0.3      # tail-exposure penalty on popularity rank (the coverage 
 FATIGUE_DAYS = 12      # cooldown: block a product type bought within this window
 CATEGORY_CAP = 3       # max articles of one product_type in the final 12
 
+# --- Experiment 7: temporal signals (trend, seasonality, contact timing) ---
+# Trend popularity window: article demand over only the last TREND_WINDOW_DAYS
+# before the reference date, vs all-time popularity.
+TREND_WINDOW_DAYS = 30
+# Seasonal-profile smoothing: pseudo-counts of the global month distribution mixed
+# into each article's month profile, so a thin-history article shrinks toward the
+# global seasonal shape instead of spiking at one month.
+SEASON_SMOOTH_K = 20
+# The label window (2020-08-26 .. 2020-09-22) is predominantly September, so the
+# seasonal signal scores each article's historical propensity for month 9.
+LABEL_MONTH = 9
+# Contact-timing bands on due_ratio = days_since_last / typical_gap. Boundaries are
+# [lo, hi); the last band is open-ended. Paired with the Phase 3b fatigue rule.
+CONTACT_BANDS = [
+    ("just purchased", 0.0, 0.4),
+    ("approaching", 0.4, 0.8),
+    ("due now", 0.8, 1.5),
+    ("overdue", 1.5, 3.0),
+    ("lapsed", 3.0, float("inf")),
+]
+
 # --- Phase 2: LinUCB contextual bandit -------------------------------------
 # UCB exploration parameter: p_a = theta_a . x + BANDIT_ALPHA * sqrt(x . A_a^-1 . x).
 # 0 = pure exploitation (no exploration); higher = more exploration.
