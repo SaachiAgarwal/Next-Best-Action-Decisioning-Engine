@@ -200,3 +200,46 @@ failure, it is what predicting 1-of-79,269 looks like.
   within it (where content and latent factors earn their keep). **Honest caveat:**
   the drill-down chain is **not implemented end-to-end** — these are two parallel
   views of the same customer, and the chain is the natural next extension.
+
+## Phase 5c — Contact-Timing Layer (`contact_timing.json`)
+
+A **seventh** committed demo file (added by `src/run_export_contact_timing.py`, a
+standalone script that does not touch the other six exports). It surfaces the Exp 7
+contact-timing bands as an action cue ("Contact now" / "Hold — recently purchased").
+Read-only inputs: `contact_timing_exp7.parquet` (band per customer), the existing
+`customers.json` (C01–C38 handle mapping), and `exp7_temporal.md` (per-band hit@12).
+Size: **4.2 KB**.
+
+### Portfolio band summary (all 15,246 evaluable customers)
+
+| band | due_ratio range | customers | share | hit@12 |
+|---|---|---|---|---|
+| just purchased | <0.4 | 3,286 | 21.6% | 0.0943 |
+| approaching | 0.4–0.8 | 2,394 | 15.7% | 0.0631 |
+| due now | 0.8–1.5 | 2,818 | 18.5% | 0.0632 |
+| overdue | 1.5–3 | 3,002 | 19.7% | 0.0476 |
+| lapsed | >3 | 3,746 | 24.6% | 0.047 |
+
+`hit@12` is parsed from `reports/exp7_temporal.md` (the Exp 7 source of truth), not
+recomputed. Counts sum to exactly 15,246.
+
+### Schema — `contact_timing.json`
+```
+{
+  "bands": [ { band, range, customers, share, hit12 } ],          # the 5 bands above
+  "customers": { "C01": { band, due_ratio, days_since_last, typical_gap } },
+  "finding": { headline, detail, caveat }
+}
+```
+- `due_ratio = days_since_last / typical_gap` (rounded 2dp); `typical_gap` = median
+  inter-purchase gap.
+- **Cold-start handling:** the 6 cold-start demo customers
+  (C33, C34, C35, C36, C37, C38) have no purchase history, so a real band would be
+  misleading. They are emitted as `band: "no history"` with
+  `due_ratio/days_since_last/typical_gap = null` — never assigned "lapsed" or "due
+  now". Any demo customer absent from the evaluable band file falls back to the same
+  "no history" record, so all 38 handles always appear.
+- The `finding` object carries the honest Exp 7 result verbatim for the UI: recency
+  beats rhythm (the "due now converts better" hypothesis failed), plus the caveat
+  that the conversion metric can't see fatigue cost and the bands are
+  frequency-confounded — resolvable only by a live experiment.

@@ -146,3 +146,94 @@ def test_prior_artifacts_intact():
     lap = config.PROCESSED_DIR / "labels_article.parquet"
     if lap.exists():
         assert pd.read_parquet(lap, columns=["customer_id"], engine="pyarrow")["customer_id"].nunique() == 15246
+
+
+# ==========================================================================
+# Phase 5c — contact-timing layer (contact_timing.json). Additive; the tests
+# above are unchanged. This block also guards the 6 prior files byte-identical.
+# ==========================================================================
+import hashlib  # noqa: E402
+
+_CT = DEMO / "contact_timing.json"
+_ctmark = pytest.mark.skipif(not _CT.exists(),
+                             reason="run: python -m src.run_export_contact_timing")
+_VALID_BANDS = {b[0] for b in config.CONTACT_BANDS} | {"no history"}
+# SHA256 of the six Phase 5a/5b demo files, captured before Phase 5c ran.
+_PRIOR_HASHES = {
+    "customers.json": "07906b6913aeb8c72222169701355fb1d757c1725b63c42509f93d9b918721c5",
+    "recommendations.json": "120c365ec499fbdd35eb009e8c8a26f273b61e3021369ef899b86e8f308d5248",
+    "explanations.json": "6e7db190ac8eb4548e10e596f4d9b32de78c82a10fa0c9541e8a9f329cae8b8b",
+    "frontier.json": "a2b6d9597a5446b44cdaf313199bff93507d29ce18ae89f4f51cefa5b2c70013",
+    "diagnostics.json": "a8927029a133f0dfa1014db9e8393da3ba56f2a3d1219a6ead3f0c2661a0ef59",
+    "producttype.json": "7f184ef70c70ca0523c7fd8f3aa80ea1c37320cb8cf3a7203d5e05deecabefae",
+}
+
+
+@pytest.fixture(scope="module")
+def ct():
+    return json.loads(_CT.read_text())
+
+
+@_ctmark
+def test_ct_all_38_customers_present(ct):
+    handles = {c["id"] for c in _load("customers.json")}
+    assert set(ct["customers"].keys()) == handles
+    assert len(ct["customers"]) == 38
+
+
+@_ctmark
+def test_ct_every_band_valid(ct):
+    for h, r in ct["customers"].items():
+        assert r["band"] in _VALID_BANDS, f"{h}: {r['band']}"
+
+
+@_ctmark
+def test_ct_cold_start_is_no_history(ct):
+    cold = {c["id"] for c in _load("customers.json") if c["profile"].get("cold")}
+    assert cold, "expected some cold-start demo customers"
+    for h in cold:
+        r = ct["customers"][h]
+        assert r["band"] == "no history"
+        assert r["due_ratio"] is None and r["days_since_last"] is None and r["typical_gap"] is None
+
+
+@_ctmark
+def test_ct_band_counts_sum_to_evaluable(ct):
+    assert sum(b["customers"] for b in ct["bands"]) == 15246
+    assert {b["band"] for b in ct["bands"]} == {b[0] for b in config.CONTACT_BANDS}
+
+
+@_ctmark
+def test_ct_band_hit12_matches_exp7_artifacts(ct):
+    # source of truth: the Exp 7 report band table
+    report = (config.REPORTS_DIR / "exp7_temporal.md").read_text()
+    import re
+    for b in ct["bands"]:
+        m = re.search(rf"\|\s*{re.escape(b['band'])}\s*\|[^|]*\|[^|]*\|\s*([0-9.]+)\s*\|", report)
+        assert m, b["band"]
+        assert abs(b["hit12"] - round(float(m.group(1)), 4)) < 1e-9
+
+
+@_ctmark
+def test_ct_schema_and_size(ct):
+    assert set(ct) == {"bands", "customers", "finding"}
+    assert set(ct["finding"]) == {"headline", "detail", "caveat"}
+    for b in ct["bands"]:
+        assert set(b) == {"band", "range", "customers", "share", "hit12"}
+    for r in ct["customers"].values():
+        assert set(r) == {"band", "due_ratio", "days_since_last", "typical_gap"}
+    assert _CT.stat().st_size < 50 * 1024
+
+
+@_ctmark
+def test_ct_committed_not_gitignored():
+    r = subprocess.run(["git", "check-ignore", "data/demo/contact_timing.json"],
+                       cwd=config.PROJECT_ROOT, capture_output=True, text=True)
+    assert r.returncode != 0, "contact_timing.json must be committed, not gitignored"
+
+
+def test_ct_regression_prior_demo_files_byte_identical():
+    """Phase 5c must ONLY add a file — the six prior exports stay byte-for-byte."""
+    for name, want in _PRIOR_HASHES.items():
+        got = hashlib.sha256((DEMO / name).read_bytes()).hexdigest()
+        assert got == want, f"{name} changed! Phase 5c must not modify existing demo files."
