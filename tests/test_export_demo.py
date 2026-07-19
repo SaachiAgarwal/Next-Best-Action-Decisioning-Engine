@@ -237,3 +237,87 @@ def test_ct_regression_prior_demo_files_byte_identical():
     for name, want in _PRIOR_HASHES.items():
         got = hashlib.sha256((DEMO / name).read_bytes()).hexdigest()
         assert got == want, f"{name} changed! Phase 5c must not modify existing demo files."
+
+
+# ==========================================================================
+# Phase 5d — portfolio segment statistics (segments.json). Additive.
+# ==========================================================================
+_SEG = DEMO / "segments.json"
+_segmark = pytest.mark.skipif(not _SEG.exists(),
+                              reason="run: python -m src.run_export_segments")
+_VALID_STATUS = {"Above average", "At average", "Below average", "No ground truth"}
+# 7 prior demo files, byte-identical before Phase 5d ran.
+_PRIOR7 = dict(_PRIOR_HASHES)
+_PRIOR7["contact_timing.json"] = "4346ae4eba02d72f57be2d26811bea6394f4c179f6f0b4e7a7abe4be9f4e3928"
+
+
+@pytest.fixture(scope="module")
+def seg():
+    return json.loads(_SEG.read_text())
+
+
+@_segmark
+def test_seg_schema(seg):
+    assert set(seg) == {"overall", "segments", "cold_start", "biggest_gap", "caveat"}
+    assert set(seg["overall"]) == {"customers", "hit12", "recall12", "avg_distinct_types", "coverage12"}
+    for s in seg["segments"]:
+        assert set(s) == {"segment", "definition", "customers", "share", "hit12", "recall12",
+                          "avg_distinct_types", "coverage12", "mean_rec_pop_rank",
+                          "mean_true_pop_rank", "status"}
+    assert set(seg["cold_start"]) == {"customers", "note"}
+    assert set(seg["biggest_gap"]) == {"segment", "statement"}
+    assert _SEG.stat().st_size < 20 * 1024
+
+
+@_segmark
+def test_seg_frequency_terciles_partition_evaluable(seg):
+    # frequency terciles are mutually exclusive and partition the 15,246 evaluable
+    freq = [s for s in seg["segments"] if "frequency" in s["segment"]]
+    assert len(freq) == 3
+    assert sum(s["customers"] for s in freq) == 15246
+    # divergent is an OVERLAPPING view -> not part of the partition sum
+    div = [s for s in seg["segments"] if s["segment"] == "divergent taste"][0]
+    assert 0 < div["customers"] < 15246
+
+
+@_segmark
+def test_seg_hit12_nonnull_except_cold_and_never_zero(seg):
+    for s in seg["segments"]:
+        assert s["hit12"] is not None, s["segment"]
+        assert s["hit12"] > 0, f"{s['segment']} hit12=0 — investigate"
+    assert seg["cold_start"]["customers"] > 0
+    assert "no ground truth" in seg["cold_start"]["note"].lower()
+
+
+@_segmark
+def test_seg_overall_matches_production(seg):
+    assert abs(seg["overall"]["hit12"] - 0.0628) < 0.003    # known production value
+
+
+@_segmark
+def test_seg_status_labels_follow_thresholds(seg):
+    oh = seg["overall"]["hit12"]
+    for s in seg["segments"]:
+        h = s["hit12"]
+        if h >= 1.1 * oh:
+            want = "Above average"
+        elif h <= 0.9 * oh:
+            want = "Below average"
+        else:
+            want = "At average"
+        assert s["status"] == want, f"{s['segment']}: {s['status']} != {want}"
+        assert s["status"] in _VALID_STATUS
+
+
+@_segmark
+def test_seg_committed_not_gitignored():
+    r = subprocess.run(["git", "check-ignore", "data/demo/segments.json"],
+                       cwd=config.PROJECT_ROOT, capture_output=True, text=True)
+    assert r.returncode != 0
+
+
+def test_seg_regression_seven_prior_files_byte_identical():
+    """Phase 5d must ONLY add a file — the seven prior exports stay byte-for-byte."""
+    for name, want in _PRIOR7.items():
+        got = hashlib.sha256((DEMO / name).read_bytes()).hexdigest()
+        assert got == want, f"{name} changed! Phase 5d must not modify existing demo files."

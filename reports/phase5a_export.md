@@ -243,3 +243,53 @@ recomputed. Counts sum to exactly 15,246.
   beats rhythm (the "due now converts better" hypothesis failed), plus the caveat
   that the conversion metric can't see fatigue cost and the bands are
   frequency-confounded — resolvable only by a live experiment.
+
+## Phase 5d — Portfolio Segment Statistics (`segments.json`)
+
+Replaces the demo's segment table — which was computed on the 38-customer cohort
+and showed 0% hit for 3 of 4 segments (a tiny-sample artifact, not model failure) —
+with **real statistics across all 15,246 evaluable customers**, scored by the
+production Exp 5 triple hybrid. Aggregate numbers only. Size **1.6 KB**.
+Standalone script `src/run_export_segments.py`; the other demo files are untouched.
+
+**Segment definitions (OVERLAPPING views — a divergent customer can also be
+high-frequency, so segment counts do NOT sum to the evaluable total):**
+- **Frequency terciles** partition the evaluable set (sum = 15,246): low ≤ 20
+  pre-cutoff purchases, mid 20–54, high > 54.
+- **Divergent taste** is an overlapping slice: the Phase 3b/Exp 3 bottom-quartile by
+  cosine-to-popularity (cosine ≤ 0.5174), 25% of the base.
+- **Cold start** (2,304) is disjoint — outside the evaluable set (no
+  label-window purchase), so it has **no ground truth**: hit rate is `null`, not 0%.
+
+**Status thresholds (Task 3), vs the overall hit@12 of 0.0628:** Above
+average ≥ 1.1×, Below average ≤ 0.9×, else At average; cold-start = "No
+ground truth".
+
+| segment | customers | share | hit@12 | recall@12 | types/list | coverage@12 | mean rec pop-rank | mean true pop-rank | status |
+|---|---|---|---|---|---|---|---|---|---|
+| **overall** | 15,246 | 100% | 0.0628 | 0.0229 | 3.5 | 40.6% | — | — | — |
+| low frequency | 5,120 | 34% | 0.0473 | 0.0242 | 2.8 | 24.8% | 10,876 | 32,492 | Below average |
+| mid frequency | 5,101 | 33% | 0.0637 | 0.0239 | 3.5 | 20.9% | 8,746 | 33,753 | At average |
+| high frequency | 5,025 | 33% | 0.0778 | 0.0206 | 4.2 | 20.1% | 10,428 | 37,687 | Above average |
+| divergent taste | 3,812 | 25% | 0.0512 | 0.0227 | 2.8 | 20.3% | 10,861 | 32,929 | Below average |
+| cold start | 2,304 | — | null | — | — | — | — | — | No ground truth |
+
+`mean rec pop-rank` vs `mean true pop-rank` is the **demand-alignment gap** per
+segment (higher rank = deeper in the tail): where the model recommends vs where the
+segment actually buys.
+
+**Biggest addressable gap** (max customers × deficit-vs-average):
+> Low frequency customers (5,120, 34% of the evaluable base) convert at 4.7% vs the 6.3% average — the largest addressable gap by volume.
+
+### Schema — `segments.json`
+```
+{
+  "overall": { customers, hit12, recall12, avg_distinct_types, coverage12 },
+  "segments": [ { segment, definition, customers, share, hit12, recall12,
+                  avg_distinct_types, coverage12, mean_rec_pop_rank,
+                  mean_true_pop_rank, status } ],
+  "cold_start": { customers, note },          # hit rate is null — no ground truth
+  "biggest_gap": { segment, statement },
+  "caveat": "…all 15,246 evaluable customers, not the 38-customer demo cohort."
+}
+```
