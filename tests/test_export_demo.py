@@ -321,3 +321,56 @@ def test_seg_regression_seven_prior_files_byte_identical():
     for name, want in _PRIOR7.items():
         got = hashlib.sha256((DEMO / name).read_bytes()).hexdigest()
         assert got == want, f"{name} changed! Phase 5d must not modify existing demo files."
+
+
+# ==========================================================================
+# Phase 5e — portfolio README. Guards that writing README.md changed nothing
+# else: every reports/*.md and all 8 data/demo/*.json stay byte-identical.
+# ==========================================================================
+_README = config.PROJECT_ROOT / "README.md"
+_DEMO8 = dict(_PRIOR7)
+_DEMO8["segments.json"] = "238116ea7077bc3c3c83a17ad1c1e889265654506a4a5b855307bb7cb7d2d2c9"
+_REPORT_HASHES = {
+    "phase2_bandit_v3.md": "1659420843d51185fe0048dc36f82d44d7a5ade758ee8ce0d6c89eaa87217334",
+    "metrics_summary.md": "1b0ab5a3834f2fe8e09cdc7dea3bf52c39d1dc922507dfe6a93f1923d233b56d",
+    "week2_item_cf.md": "1c61aebc661d7c5daabeb28a581ec74307af059b16a4ffc7d542f1cc1a5b0300",
+    "phase3b_reranker.md": "26cdbcf64465569d0afc081eee7f0187e3ccb22e700c819463a0641d888c6cd6",
+    "phase4_explainer.md": "2bf07e34942a0208fe171e7abc7b894e99c770395bdd8db9706810a519920a73",
+    "phase3a_diagnostics.md": "2e9b1a77ede541351a3e63abb9db6dc472ca1d06d2becb1e38cb444b7a8977dc",
+    "exp6_attributes.md": "3b22eb9573b4493371a40bcdd030366c7007530b82f4527b68682718bf85e674",
+    "week2_granularity_experiment.md": "518d89e5d7edd73c67afa6ec00455d5843e8fca64705ab227c578c517e841c4d",
+    "phase2c_bandit_shared.md": "51f37619329f38c0b6da2c00a79239912564fb8e5242a1988a7b68216e54b5ea",
+    "phase2_bandit_v2.md": "6a54fa6b784367a422fb62b75faf6561ecf73c23b7f2f070be90d6f74ed909e5",
+    "phase2_bandit.md": "6b72e40960e3a7cd58e2c19dd911250c4464153588486e1da94ff4fcd26fade6",
+    "phase5a_export.md": "88702254b1a84f4a2b91f439828bdce61fd6b9a097f602956a9674211eceeb84",
+    "week2_baseline.md": "8b5f288e4f8234264bf6cd52133dca23ed9738405733732ecc4be116c669a0f1",
+    "week2_exp3_hybrid.md": "91a0dd8c880a7a0b618d88c198228d9519f9ad92a78650e7b70125face6a6e9d",
+    "week1_data_profile.md": "bd6eec57686a3f03af58f2a51af5a8773ff965383e2088019ddaf264d445af88",
+    "context_layer.md": "c2dbec0ee3574a8f454cbd834931c23b10e9fe309f1a93540870fcec3f3712b5",
+    "exp7_temporal.md": "d773b11b688918162ff666b732455f376f133a7b806d334c44cf06c45a0d18b3",
+    "exp4_content_hybrid.md": "e3c085990f25e73b5bee260be8bb15fcf0807dac4b9834e1410cbba418f19418",
+    "exp5_mf.md": "efc8c5edf03f88e070449bd4b5013128a7a540b210c9a04ff0b0e32082908d1f",
+}
+
+
+def test_readme_exists_with_required_sections():
+    assert _README.exists()
+    txt = _README.read_text()
+    for h in ["# Next-Best-Action Decisioning Engine", "## The finding",
+              "## Production model", "## The seven experiments", "## Architecture",
+              "## Reading the numbers honestly", "## Honest limitations",
+              "## Full write-ups", "## Author"]:
+        assert h in txt, f"README missing section: {h}"
+
+
+def test_readme_phase_regression_reports_and_demo_byte_identical():
+    """Phase 5e writes only README.md — all reports and all 8 demo files unchanged."""
+    for name, want in _DEMO8.items():
+        got = hashlib.sha256((DEMO / name).read_bytes()).hexdigest()
+        assert got == want, f"data/demo/{name} changed — Phase 5e must not modify it."
+    reports_dir = config.REPORTS_DIR
+    for name, want in _REPORT_HASHES.items():
+        got = hashlib.sha256((reports_dir / name).read_bytes()).hexdigest()
+        assert got == want, f"reports/{name} changed — Phase 5e must not modify it."
+    # no unexpected extra report files slipped in
+    assert {p.name for p in reports_dir.glob("*.md")} == set(_REPORT_HASHES)
